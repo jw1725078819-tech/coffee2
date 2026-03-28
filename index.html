@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心像咖啡 - 你的专属情绪画像</title>
+    <style>
+        :root {
+            --bg-color: #1a1a24;
+            --text-color: #e0e0e0;
+            --accent-color: #d4af37;
+            --btn-bg: #2a2a35;
+        }
+        body {
+            margin: 0;
+            font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #app {
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a1a24 0%, #0d0d14 100%);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .screen {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 40px 30px;
+            box-sizing: border-box;
+            text-align: center;
+            animation: fadeIn 0.6s ease-out;
+        }
+        .screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 按钮样式 */
+        button, .option-btn {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: 1px solid #444;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 12px;
+            transition: 0.3s;
+        }
+        .primary-btn { background-color: var(--accent-color); color: #000; font-weight: bold; border: none; }
+        
+        /* 结果展示区 [cite: 151, 152] */
+        .result-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .emotion-portrait {
+            width: 100%;
+            aspect-ratio: 1/1; /* 保持正方形 */
+            background: #000;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .emotion-portrait img { width: 100%; height: 100%; object-fit: cover; }
+        .tags { color: var(--accent-color); font-weight: bold; margin-bottom: 15px; letter-spacing: 1px; }
+        .copywrite { font-size: 1.1rem; line-height: 1.6; font-style: italic; color: #fff; }
+        
+        .footer-note { margin-top: 20px; font-size: 0.8rem; color: #666; border-top: 1px solid #333; padding-top: 15px; }
+
+        /* 加载动画 */
+        .loader { border: 3px solid #333; border-top: 3px solid var(--accent-color); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="welcome-screen" class="screen active">
+        <h1 style="font-weight: 300;">心像咖啡馆</h1>
+        <p style="color: #888; margin-bottom: 40px;">贩售懂你的情绪</p>
+        <button class="primary-btn" onclick="startQuiz()">推门进入</button>
+    </div>
+
+    <div id="quiz-screen" class="screen">
+        <h2 id="question-text" style="font-size: 1.3rem;">正在感应...</h2>
+        <div id="options-container" style="width: 100%; margin-top: 20px;"></div>
+    </div>
+
+    <div id="loading-screen" class="screen">
+        <div class="loader"></div>
+        <p>AI 正在捕捉你的情绪波长...</p>
+    </div>
+
+    <div id="result-screen" class="screen">
+        <div class="result-card">
+            <div class="emotion-portrait" id="result-image">
+                </div>
+            <div class="tags" id="result-tags">#标签</div>
+            <p class="copywrite" id="result-copy">文案内容</p>
+            <div class="footer-note">
+                长按保存画像，凭此图到店打印专属杯身 [cite: 48]
+            </div>
+        </div>
+        <button style="margin-top: 20px;" onclick="location.reload()">重新测试</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { text: "咖啡馆里的灯光是...", options: [{text:"琥珀色",type:"A"}, {text:"复古蓝",type:"B"}, {text:"柠檬黄",type:"C"}, {text:"暗紫色",type:"D"}] },
+        { text: "你希望递给你的水是...", options: [{text:"肉桂可可",type:"A"}, {text:"冰气泡水",type:"B"}, {text:"白开水",type:"C"}, {text:"莓果汁",type:"D"}] },
+        { text: "窗外停下的风景是...", options: [{text:"金色麦田",type:"A"}, {text:"雨中街道",type:"B"}, {text:"艺术展厅",type:"C"}, {text:"游乐园",type:"D"}] },
+        { text: "留言本上的符号是...", options: [{text:"金继之心",type:"A"}, {text:"上升气球",type:"B"}, {text:"紧握拳头",type:"C"}, {text:"慵懒猫咪",type:"D"}] }
+    ];
+
+    // 修改：将生成的图片文件名对应到结果逻辑 [cite: 43]
+    const results = {
+        "A": { tags: "#治愈 #温暖 #重塑", copy: "“生活散落的碎片，终会被温柔拼起。”", img: "image_0.png" },
+        "B": { tags: "#宣泄 #释怀 #自由", copy: "“别把情绪调成静音，让这杯咖啡帮你喊出来。”", img: "image_4.png" },
+        "C": { tags: "#内向 #自省 #沉淀", copy: "“允许自己走得慢一点，你的答案就在下个路口。”", img: "image_8.png" },
+        "D": { tags: "#活力 #期待 #随性", copy: "“既然心里的花开了，就让它肆意绽放。”", img: "image_10.png" }
+    };
+
+    let currentQ = 0;
+    let scores = { A:0, B:0, C:0, D:0 };
+
+    function startQuiz() { showScreen('quiz-screen'); renderQ(); }
+    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+    function renderQ() {
+        const q = questions[currentQ];
+        document.getElementById('question-text').innerText = q.text;
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        q.options.forEach(o => {
+            const btn = document.createElement('button');
+            btn.innerText = o.text;
+            btn.onclick = () => { scores[o.type]++; next(); };
+            container.appendChild(btn);
+        });
+    }
+
+    function next() {
+        currentQ++;
+        if (currentQ < questions.length) renderQ();
+        else showResult();
+    }
+
+    function showResult() {
+        showScreen('loading-screen');
+        const winner = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+        const data = results[winner];
+
+        setTimeout(() => {
+            document.getElementById('result-tags').innerText = data.tags;
+            document.getElementById('result-copy').innerText = data.copy;
+            // 插入图片 [cite: 43]
+            const imgDiv = document.getElementById('result-image');
+            imgDiv.innerHTML = `<img src="${data.img}" alt="情绪画像">`;
+            showScreen('result-screen');
+        }, 2000);
+    }
+</script>
+
+</body>
+</html>
